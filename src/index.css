@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    /* Atualizado para o fundo verde escuro e texto padrão branco/claro */
+    @apply bg-[#114f3e] text-[#e4f1ec] antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Aplica a Space Grotesk automaticamente para todos os títulos */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', sans-serif;
+    /* Títulos agora ficam brancos para dar contraste no fundo escuro */
+    @apply tracking-tight text-white font-bold;
+  }
+
+  /* Cor da seleção de texto combinando com a paleta verde */
+  ::selection {
+    @apply bg-[#2a7a63] text-white;
+  }
+}
+
+/* --- Detalhes de Acabamento --- */
+
+/* Scrollbar personalizada adaptada para o tema escuro */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  /* Scrollbar em um verde um pouco mais claro que o fundo */
+  @apply bg-[#1b614d] rounded-full hover:bg-[#21735c] transition-colors;
+}
