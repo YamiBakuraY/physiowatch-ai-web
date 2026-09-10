@@ -1229,8 +1229,7 @@ function EditPatientModal({ patient, onSave, onCancel }) {
   );
 }
 
-function PhysioList({ patients, entriesMap, onSelect, onLogout, onAddPatient, onEditPatient, onDeletePatient, onExportData, onImportData }) {
-  const fileInputRef = React.useRef();
+function PhysioList({ patients, entriesMap, onSelect, onLogout, onAddPatient, onEditPatient, onDeletePatient }) {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
@@ -1287,43 +1286,6 @@ function PhysioList({ patients, entriesMap, onSelect, onLogout, onAddPatient, on
         >
           <Plus size={24} /> Cadastrar novo paciente
         </button>
-
-        <div className="rounded-xl p-4 mb-2 shadow-sm" style={{ backgroundColor: C.surface, border: `1px solid ${C.line}` }}>
-          <p className="text-sm font-bold mb-3" style={{ color: C.inkSoft, fontFamily: bodyFont }}>
-            💾 BACKUP E RESTAURAÇÃO
-          </p>
-          <div className="flex gap-2 flex-col">
-            <button
-              onClick={onExportData}
-              className="rounded-lg px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 w-full"
-              style={{ backgroundColor: C.primary, color: '#fff', fontFamily: headFont }}
-            >
-              ⬇️ Fazer Backup (JSON)
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-lg px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 w-full"
-              style={{ backgroundColor: C.mint, color: C.primaryDark, fontFamily: headFont }}
-            >
-              ⬆️ Restaurar Backup
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  onImportData(file);
-                }
-              }}
-            />
-            <p className="text-xs font-medium" style={{ color: C.inkSoft, fontFamily: bodyFont }}>
-              📝 Você pode fazer backup de todos os dados e restaurar quando necessário
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -1698,88 +1660,6 @@ export default function PhysioWatchAI() {
     setView('login');
   };
 
-  const exportDataAsJSON = useCallback(() => {
-    try {
-      const allData = {
-        version: '1.1.0',
-        exportDate: new Date().toISOString(),
-        patients,
-        entries: entriesMap,
-        meds: medsMap,
-        taken: takenMap,
-      };
-
-      const dataStr = JSON.stringify(allData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `physiowatch-backup-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      alert('Backup exportado com sucesso!');
-    } catch (error) {
-      console.error('Erro ao exportar dados:', error);
-      alert(`Erro ao exportar: ${error.message}`);
-    }
-  }, [patients, entriesMap, medsMap, takenMap]);
-
-  const importDataFromJSON = useCallback((file) => {
-    try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const content = e.target.result;
-          const allData = JSON.parse(content);
-
-          if (!allData.patients || !allData.entries || !allData.meds || !allData.taken) {
-            throw new Error('Arquivo não contém dados válidos');
-          }
-
-          // Confirmar antes de sobrescrever
-          const confirmImport = window.confirm(
-            `Importar ${allData.patients.length} pacientes e todos os dados associados?\nISSO SOBRESCREVERÁ OS DADOS ATUAIS!`
-          );
-          if (!confirmImport) return;
-
-          // Salvar no localStorage
-          await safeSet('patients:list', allData.patients);
-          setPatients(allData.patients);
-
-          await safeSet('entries:map', allData.entries);
-          setEntriesMap(allData.entries);
-
-          await safeSet('meds:map', allData.meds);
-          setMedsMap(allData.meds);
-
-          await safeSet('taken:map', allData.taken);
-          setTakenMap(allData.taken);
-
-          // Também salvar cada entrada individual
-          for (const patientId in allData.patients) {
-            if (allData.entries[allData.patients[patientId].id]) {
-              await safeSet(`entries:${allData.patients[patientId].id}`, allData.entries[allData.patients[patientId].id]);
-              await safeSet(`meds:${allData.patients[patientId].id}`, allData.meds[allData.patients[patientId].id]);
-              await safeSet(`medTaken:${allData.patients[patientId].id}`, allData.taken[allData.patients[patientId].id]);
-            }
-          }
-
-          alert('Dados importados com sucesso! A página será recarregada.');
-          window.location.reload();
-        } catch (error) {
-          console.error('Erro ao processar arquivo:', error);
-          alert(`Erro ao importar: ${error.message}`);
-        }
-      };
-      reader.readAsText(file);
-    } catch (error) {
-      console.error('Erro ao importar dados:', error);
-      alert(`Erro ao importar: ${error.message}`);
-    }
-  }, []);
 
   const handleAddPatient = useCallback(async (newPatient) => {
     try {
@@ -2178,8 +2058,6 @@ export default function PhysioWatchAI() {
           onAddPatient={() => setShowNewPatientModal(true)}
           onEditPatient={(patient) => setEditingPatient(patient)}
           onDeletePatient={handleDeletePatient}
-          onExportData={exportDataAsJSON}
-          onImportData={importDataFromJSON}
         />
         {showNewPatientModal && (
           <NewPatientModal
