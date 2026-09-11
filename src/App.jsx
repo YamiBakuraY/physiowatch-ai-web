@@ -553,8 +553,8 @@ function PatientHome({ patient, entries, onGoEntry, onGoMeds, onLogout, onResetP
     <>
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <TopBar title="PhysioWatch AI" onLogout={onLogout} />
-      <div className="px-5 pb-24">
-        <h2 style={{ fontFamily: headFont, color: C.ink }} className="text-xl font-bold mb-1">
+      <div className="px-4 md:px-6 pb-24">
+        <h2 style={{ fontFamily: headFont, color: C.ink }} className="text-lg md:text-xl font-bold mb-1">
           Olá, {patient.name.split(' ')[0]} 👋
         </h2>
         
@@ -815,20 +815,20 @@ function DailyEntryForm({ patient, onSave, onDone, onBack }) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           {MOODS.map(({ key, label, icon: Icon, color }) => (
             <button
               key={key}
               onClick={() => setMood(key)}
-              className="rounded-2xl py-10 flex flex-col items-center gap-4 shadow-sm transition-all"
+              className="rounded-2xl py-8 md:py-10 flex flex-col items-center gap-2 md:gap-4 shadow-sm transition-all"
               style={{
                 backgroundColor: mood === key ? `${color}22` : C.surface,
                 border: `4px solid ${mood === key ? color : C.line}`,
-                minHeight: 168,
+                minHeight: 160,
               }}
             >
-              <Icon size={62} color={color} />
-              <span className="text-2xl font-bold" style={{ color: C.ink, fontFamily: bodyFont }}>
+              <Icon size={50} color={color} className="md:w-[62px] md:h-[62px]" />
+              <span className="text-lg md:text-2xl font-bold text-center" style={{ color: C.ink, fontFamily: bodyFont }}>
                 {label}
               </span>
             </button>
@@ -875,7 +875,7 @@ function DailyEntryForm({ patient, onSave, onDone, onBack }) {
           <label className="text-base font-bold flex items-center gap-2 mb-4" style={{ color: C.ink, fontFamily: bodyFont }}>
             <Moon size={20} color={C.primary} /> Quanto tempo você dormiu?
           </label>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <Field label="Horas" value={sleepH} onChange={setSleepH} placeholder="Ex: 7" icon={<Moon size={16} color={C.primary} />} />
             <Field label="Minutos" value={sleepM} onChange={setSleepM} placeholder="Ex: 30" icon={<Moon size={16} color={C.primary} />} />
           </div>
@@ -885,7 +885,7 @@ function DailyEntryForm({ patient, onSave, onDone, onBack }) {
           <label className="text-base font-bold flex items-center gap-2 mb-4" style={{ color: C.ink, fontFamily: bodyFont }}>
             <Activity size={20} color={C.primary} /> Sinais Vitais (Opcional)
           </label>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <Field icon={<HeartPulse size={16} color={C.primary} />} label="Frequência (bpm)" value={fc} onChange={setFc} placeholder="Ex: 72" />
             <Field icon={<Wind size={16} color={C.primary} />} label="Oxigenação (SpO₂)" value={spo2} onChange={setSpo2} placeholder="Ex: 98" />
             <Field icon={<Droplet size={16} color={C.primary} />} label="Pressão (Sistólica)" value={paSys} onChange={setPaSys} placeholder="Ex: 120" />
@@ -1234,7 +1234,7 @@ function PhysioList({ patients, entriesMap, onSelect, onLogout, onAddPatient, on
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.bg }}>
       <TopBar title="Painel do Fisioterapeuta" onLogout={onLogout} />
-      <div className="px-5 pb-10 flex flex-col gap-4">
+      <div className="px-4 md:px-6 pb-10 flex flex-col gap-4">
         {patients.map((p) => {
           const entries = entriesMap[p.id] || [];
           const latest = entries[entries.length - 1];
@@ -1242,34 +1242,34 @@ function PhysioList({ patients, entriesMap, onSelect, onLogout, onAddPatient, on
           return (
             <div
               key={p.id}
-              className="rounded-xl p-4 shadow-sm"
+              className="rounded-xl p-4 md:p-5 shadow-sm transition-all hover:shadow-md"
               style={{ backgroundColor: C.surface, border: `1px solid ${C.line}` }}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                 <button
                   onClick={() => onSelect(p.id)}
                   className="flex-1 text-left"
                 >
-                  <p className="text-lg font-bold" style={{ color: C.ink, fontFamily: bodyFont }}>
+                  <p className="text-base md:text-lg font-bold" style={{ color: C.ink, fontFamily: bodyFont }}>
                     {p.name}
                   </p>
-                  <p className="text-sm font-medium mt-1 flex items-center gap-1.5" style={{ color: status.color, fontFamily: bodyFont }}>
+                  <p className="text-xs md:text-sm font-medium mt-1 flex items-center gap-1.5" style={{ color: status.color, fontFamily: bodyFont }}>
                     <span>{status.dot}</span> {status.label}
                   </p>
                 </button>
 
-                <div className="flex flex-col gap-2 ml-2">
+                <div className="flex flex-row md:flex-col gap-2 w-full md:w-auto">
                   <button
                     onClick={() => onEditPatient(p)}
-                    className="rounded-lg px-2 py-2 text-xs font-bold flex items-center justify-center gap-1"
-                    style={{ backgroundColor: C.mint, color: C.primaryDark, minWidth: 86, fontFamily: headFont }}
+                    className="flex-1 md:flex-none rounded-lg px-3 py-2 text-xs font-bold flex items-center justify-center gap-1"
+                    style={{ backgroundColor: C.mint, color: C.primaryDark, minWidth: 80, fontFamily: headFont }}
                   >
                     <Pencil size={14} /> Editar
                   </button>
                   <button
                     onClick={() => onDeletePatient(p.id)}
-                    className="rounded-lg px-2 py-2 text-xs font-bold flex items-center justify-center gap-1"
-                    style={{ backgroundColor: '#FEE2E2', color: '#991B1B', minWidth: 86, fontFamily: headFont }}
+                    className="flex-1 md:flex-none rounded-lg px-3 py-2 text-xs font-bold flex items-center justify-center gap-1"
+                    style={{ backgroundColor: '#FEE2E2', color: '#991B1B', minWidth: 80, fontFamily: headFont }}
                   >
                     <Trash2 size={14} /> Excluir
                   </button>
@@ -1281,10 +1281,10 @@ function PhysioList({ patients, entriesMap, onSelect, onLogout, onAddPatient, on
 
         <button
           onClick={onAddPatient}
-          className="rounded-xl p-5 flex items-center justify-center gap-2 border-2 border-dashed"
+          className="rounded-xl p-4 md:p-5 flex items-center justify-center gap-2 border-2 border-dashed transition-all hover:shadow-md"
           style={{ borderColor: C.primary, color: C.primary, backgroundColor: 'transparent' }}
         >
-          <Plus size={24} /> Cadastrar novo paciente
+          <Plus size={20} className="md:w-6 md:h-6" /> <span className="text-sm md:text-base font-bold">Cadastrar novo paciente</span>
         </button>
       </div>
     </div>
@@ -1299,7 +1299,7 @@ function AdherenceChart({ entries, meds, taken }) {
     return { date: fmtDate(e.date), pct };
   });
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={280}>
       <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
         <CartesianGrid stroke={C.line} strokeDasharray="3 3" />
         <XAxis dataKey="date" tick={{ fontSize: 12, fill: C.inkSoft }} />
@@ -1323,7 +1323,7 @@ function MetricModal({ metricKey, entries, meds, taken, onClose }) {
       onClick={onClose}
     >
       <div
-        className="w-full sm:max-w-md rounded-2xl p-6"
+        className="w-full sm:max-w-md md:max-w-xl rounded-2xl p-4 sm:p-6"
         style={{ backgroundColor: C.surface, maxHeight: '85vh', overflowY: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1339,7 +1339,7 @@ function MetricModal({ metricKey, entries, meds, taken, onClose }) {
         {metricKey === 'adherence' ? (
           <AdherenceChart entries={entries} meds={meds} taken={taken} />
         ) : metricKey === 'pa' ? (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid stroke={C.line} strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 12, fill: C.inkSoft }} />
@@ -1351,7 +1351,7 @@ function MetricModal({ metricKey, entries, meds, taken, onClose }) {
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={280}>
             <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid stroke={C.line} strokeDasharray="3 3" />
               <XAxis dataKey="date" tick={{ fontSize: 12, fill: C.inkSoft }} />
