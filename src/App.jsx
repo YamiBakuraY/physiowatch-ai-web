@@ -10,7 +10,13 @@ import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend, ResponsiveContainer as RespContainer
 } from 'recharts';
+import { createClient } from '@supabase/supabase-js';
 
+// URL e Chave já configuradas certinhas para o seu projeto!
+const supabaseUrl = 'https://zjwriejvyajqdrohmili.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpqd3JpZWp2eWFqcWRyb2htaWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNzg1NzgsImV4cCI6MjEwNDY1NDU3OH0.YH7yKYGIwke_JgsaavLALRHELTD-QzrmI7Wbs3esfYc';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 // ---------- design tokens ----------
 const C = {
   bg: '#F4F7F6',
@@ -85,13 +91,26 @@ const METRIC_META = {
 };
 
 // ---------- storage helpers (browser localStorage) com tratamento de erro melhorado ----------
+// ---------- storage helpers (AGORA NA NUVEM VIA SUPABASE) ----------
+
 async function safeGet(key) {
   try {
     if (!key || typeof key !== 'string') return null;
-    const v = localStorage.getItem(key);
-    return v ? JSON.parse(v) : null;
+    
+    const { data, error } = await supabase
+      .from('app_data')
+      .select('payload')
+      .eq('id', key)
+      .single();
+
+    // Se não achar o dado (ex: primeiro acesso), retorna null normal
+    if (error && error.code !== 'PGRST116') {
+      console.warn(`Aviso ao recuperar ${key}:`, error.message);
+    }
+    
+    return data ? data.payload : null;
   } catch (e) {
-    console.warn(`Erro ao recuperar ${key}:`, e.message);
+    console.warn(`Erro no catch ao recuperar ${key}:`, e.message);
     return null;
   }
 }
@@ -99,17 +118,21 @@ async function safeGet(key) {
 async function safeSet(key, value) {
   try {
     if (!key || typeof key !== 'string') return false;
-    localStorage.setItem(key, JSON.stringify(value));
+    
+    const { error } = await supabase
+      .from('app_data')
+      .upsert({ 
+        id: key, 
+        payload: value 
+      }, { onConflict: 'id' });
+
+    if (error) throw error;
     return true;
   } catch (e) {
-    console.error(`Erro ao salvar ${key}:`, e.message);
-    if (e.name === 'QuotaExceededError') {
-      console.error('Espaço de armazenamento cheio');
-    }
+    console.error(`Erro ao salvar ${key} na nuvem:`, e.message);
     return false;
   }
 }
-
 // ---------- demo data seeding ----------
 function genEntries(painStart, painEnd, sleepStart, sleepEnd, stepsStart, stepsEnd, fcStart, fcEnd) {
   const entries = [];
