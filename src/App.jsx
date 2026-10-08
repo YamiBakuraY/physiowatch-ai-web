@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Heart, Moon, Pill, Smile, Meh, Frown, AlertCircle, CheckCircle2,
   ChevronRight, ArrowLeft, Droplet, Wind, Sparkles,
-  User, Stethoscope, LogOut, TrendingDown, TrendingUp, Minus, Loader2,
+  User, Stethoscope, LogOut, TrendingDown, TrendingUp, Minus,
   Activity, Lock, Plus, X, Footprints, HeartPulse, BarChart2,
   Pencil, Trash2, AlertTriangle
 } from 'lucide-react';
@@ -11,6 +11,7 @@ import {
   XAxis, YAxis, Tooltip, CartesianGrid, Legend, ResponsiveContainer as RespContainer
 } from 'recharts';
 import { createClient } from '@supabase/supabase-js';
+import { Navigate, useMatch, useNavigate, useParams, useRoutes } from 'react-router-dom';
 
 // URL e Chave já configuradas certinhas para o seu projeto!
 const supabaseUrl = 'https://zjwriejvyajqdrohmili.supabase.co';
@@ -133,6 +134,37 @@ async function safeSet(key, value) {
     return false;
   }
 }
+
+async function safeGetMany(keys) {
+  if (!Array.isArray(keys) || keys.length === 0) return {};
+
+  try {
+    const { data, error } = await supabase
+      .from('app_data')
+      .select('id, payload')
+      .in('id', keys);
+
+    if (error) throw error;
+    return Object.fromEntries((data || []).map(({ id, payload }) => [id, payload]));
+  } catch (error) {
+    console.warn('Erro ao recuperar dados iniciais:', error.message);
+    return {};
+  }
+}
+
+async function safeSetMany(records) {
+  try {
+    const { error } = await supabase
+      .from('app_data')
+      .upsert(records, { onConflict: 'id' });
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Erro ao salvar dados iniciais na nuvem:', error.message);
+    return false;
+  }
+}
 // ---------- demo data seeding ----------
 function genEntries(painStart, painEnd, sleepStart, sleepEnd, stepsStart, stepsEnd, fcStart, fcEnd) {
   const entries = [];
@@ -162,31 +194,49 @@ const DEMO_MEDS = [
   { id: 'm3', name: 'Relaxante muscular', time: '20:00' },
 ];
 
-async function ensureSeed() {
-  try {
-    let list = await safeGet('patients:list');
-    if (list && Array.isArray(list) && list.length > 0) return list;
+async function loadInitialData() {
+  let patients = await safeGet('patients:list');
 
-    list = [
+  if (!Array.isArray(patients) || patients.length === 0) {
+    patients = [
       { id: 'p1', name: 'Elias Souza', age: 34, treatment: 'Reabilitação de joelho', password: '123' },
       { id: 'p2', name: 'Marina Alves', age: 41, treatment: 'Fisioterapia lombar', password: '123' },
     ];
-    
-    const saved = await safeSet('patients:list', list);
-    if (!saved) throw new Error('Falha ao salvar pacientes iniciais');
 
-    await safeSet('entries:p1', genEntries(7.0, 3.2, 5.8, 6.7, 4800, 6200, 78, 74));
-    await safeSet('entries:p2', genEntries(5.5, 5.0, 6.0, 6.1, 5200, 5300, 80, 79));
+    const entriesMap = {
+      p1: genEntries(7.0, 3.2, 5.8, 6.7, 4800, 6200, 78, 74),
+      p2: genEntries(5.5, 5.0, 6.0, 6.1, 5200, 5300, 80, 79),
+    };
+    const medsMap = Object.fromEntries(patients.map(({ id }) => [id, DEMO_MEDS]));
+    const takenMap = Object.fromEntries(patients.map(({ id }) => [id, []]));
+    const records = [
+      { id: 'patients:list', payload: patients },
+      ...patients.flatMap(({ id }) => [
+        { id: `entries:${id}`, payload: entriesMap[id] },
+        { id: `meds:${id}`, payload: medsMap[id] },
+        { id: `medTaken:${id}`, payload: takenMap[id] },
+      ]),
+    ];
 
-    for (const p of list) {
-      await safeSet(`meds:${p.id}`, DEMO_MEDS);
-      await safeSet(`medTaken:${p.id}`, []);
+    if (!await safeSetMany(records)) {
+      throw new Error('Falha ao salvar dados iniciais');
     }
-    return list;
-  } catch (error) {
-    console.error('Erro ao inicializar dados:', error);
-    return [];
+
+    return { patients, entriesMap, medsMap, takenMap };
   }
+
+  const records = await safeGetMany(patients.flatMap(({ id }) => [
+    `entries:${id}`,
+    `meds:${id}`,
+    `medTaken:${id}`,
+  ]));
+
+  return {
+    patients,
+    entriesMap: Object.fromEntries(patients.map(({ id }) => [id, records[`entries:${id}`] || []])),
+    medsMap: Object.fromEntries(patients.map(({ id }) => [id, records[`meds:${id}`] || DEMO_MEDS])),
+    takenMap: Object.fromEntries(patients.map(({ id }) => [id, records[`medTaken:${id}`] || []])),
+  };
 }
 
 // ---------- derived stats ----------
@@ -1627,6 +1677,13 @@ function PhysioReport({ patient, entries, meds, taken, onBack }) {
 }
 
 // ---------- root ----------
+function PatientRoute({ patients, render }) {
+  const { patientId } = useParams();
+  const patient = patients.find((item) => item.id === patientId);
+
+  return patient ? render(patient, patientId) : <Navigate to="/" replace />;
+}
+
 export default function PhysioWatchAI() {
   const [ready, setReady] = useState(false);
   const [patients, setPatients] = useState([]);
@@ -1634,32 +1691,32 @@ export default function PhysioWatchAI() {
   const [medsMap, setMedsMap] = useState({});
   const [takenMap, setTakenMap] = useState({});
 
-  const [role, setRole] = useState(null);
-  const [currentPatientId, setCurrentPatientId] = useState(null);
-  const [view, setView] = useState('login');
+  const navigate = useNavigate();
+  const patientRoute = useMatch('/patient/:patientId/*');
+  const physioReportRoute = useMatch('/physio/:patientId');
+  const currentPatientId = patientRoute?.params.patientId || physioReportRoute?.params.patientId || null;
   const [showNewPatientModal, setShowNewPatientModal] = useState(false);
   const [editingPatient, setEditingPatient] = useState(null);
 
   useEffect(() => {
+    const startedAt = performance.now();
+
     (async () => {
       try {
-        const list = await ensureSeed();
-        if (!Array.isArray(list) || list.length === 0) {
+        const initialData = await loadInitialData();
+        if (!Array.isArray(initialData.patients) || initialData.patients.length === 0) {
           throw new Error('Falha ao carregar pacientes');
         }
 
-        const eMap = {}, mMap = {}, tMap = {};
-        for (const p of list) {
-          eMap[p.id] = (await safeGet(`entries:${p.id}`)) || [];
-          mMap[p.id] = (await safeGet(`meds:${p.id}`)) || DEMO_MEDS;
-          tMap[p.id] = (await safeGet(`medTaken:${p.id}`)) || [];
-        }
-        
-        setPatients(list);
-        setEntriesMap(eMap);
-        setMedsMap(mMap);
-        setTakenMap(tMap);
+        setPatients(initialData.patients);
+        setEntriesMap(initialData.entriesMap);
+        setMedsMap(initialData.medsMap);
+        setTakenMap(initialData.takenMap);
         setReady(true);
+
+        if (import.meta.env.DEV) {
+          console.info(`Aplicativo pronto em ${Math.round(performance.now() - startedAt)} ms`);
+        }
       } catch (error) {
         console.error('Erro ao inicializar aplicativo:', error);
         setReady(true); // Ainda assim exibe a UI mesmo com erro
@@ -1668,19 +1725,15 @@ export default function PhysioWatchAI() {
   }, []);
 
   const handleEnter = (r, patientId) => {
-    setRole(r);
     if (r === 'paciente') {
-      setCurrentPatientId(patientId);
-      setView('patient-home');
+      navigate(`/patient/${patientId}`);
     } else {
-      setView('physio-list');
+      navigate('/physio');
     }
   };
 
   const handleLogout = () => {
-    setRole(null);
-    setCurrentPatientId(null);
-    setView('login');
+    navigate('/');
   };
 
 
@@ -1779,14 +1832,13 @@ export default function PhysioWatchAI() {
       });
 
       if (currentPatientId === patientId) {
-        setCurrentPatientId(null);
-        setView('physio-list');
+        navigate('/physio');
       }
     } catch (error) {
       console.error('Erro ao excluir paciente:', error);
       alert(`Erro ao excluir: ${error.message}`);
     }
-  }, [currentPatientId, patients]);
+  }, [currentPatientId, navigate, patients]);
 
   const handleResetPassword = useCallback(async (patientId, currentPassword, newPassword) => {
     try {
@@ -2001,117 +2053,135 @@ export default function PhysioWatchAI() {
     [currentPatientId, takenMap]
   );
 
+  const route = useRoutes([
+    {
+      path: '/',
+      element: <LoginScreen patients={patients} onEnter={handleEnter} />,
+    },
+    {
+      path: '/patient/:patientId',
+      element: (
+        <PatientRoute
+          patients={patients}
+          render={(patient, patientId) => (
+            <PatientHome
+              patient={patient}
+              entries={entriesMap[patientId] || []}
+              onGoEntry={() => navigate(`/patient/${patientId}/entry`)}
+              onGoMeds={() => navigate(`/patient/${patientId}/meds`)}
+              onLogout={handleLogout}
+              onResetPassword={handleResetPassword}
+            />
+          )}
+        />
+      ),
+    },
+    {
+      path: '/patient/:patientId/entry',
+      element: (
+        <PatientRoute
+          patients={patients}
+          render={(patient, patientId) => (
+            <DailyEntryForm
+              patient={patient}
+              onSave={saveEntry}
+              onDone={() => navigate(`/patient/${patientId}`)}
+              onBack={() => navigate(`/patient/${patientId}`)}
+            />
+          )}
+        />
+      ),
+    },
+    {
+      path: '/patient/:patientId/meds',
+      element: (
+        <PatientRoute
+          patients={patients}
+          render={(patient, patientId) => (
+            <MedsScreen
+              patient={patient}
+              meds={medsMap[patientId] || DEMO_MEDS}
+              taken={takenMap[patientId] || []}
+              onToggle={toggleMed}
+              onAddMed={addMed}
+              onEditMed={editMed}
+              onDeleteMed={deleteMed}
+              onToggleTaken={toggleMedTaken}
+              onBack={() => navigate(`/patient/${patientId}`)}
+            />
+          )}
+        />
+      ),
+    },
+    {
+      path: '/physio',
+      element: (
+        <>
+          <PhysioList
+            patients={patients}
+            entriesMap={entriesMap}
+            onSelect={(patientId) => navigate(`/physio/${patientId}`)}
+            onLogout={handleLogout}
+            onAddPatient={() => setShowNewPatientModal(true)}
+            onEditPatient={(patient) => setEditingPatient(patient)}
+            onDeletePatient={handleDeletePatient}
+          />
+          {showNewPatientModal && (
+            <NewPatientModal
+              onSave={handleAddPatient}
+              onCancel={() => setShowNewPatientModal(false)}
+            />
+          )}
+          {editingPatient && (
+            <EditPatientModal
+              patient={editingPatient}
+              onSave={handleEditPatient}
+              onCancel={() => setEditingPatient(null)}
+            />
+          )}
+        </>
+      ),
+    },
+    {
+      path: '/physio/:patientId',
+      element: (
+        <PatientRoute
+          patients={patients}
+          render={(patient, patientId) => (
+            <PhysioReport
+              patient={patient}
+              entries={entriesMap[patientId] || []}
+              meds={medsMap[patientId] || DEMO_MEDS}
+              taken={takenMap[patientId] || []}
+              onBack={() => navigate('/physio')}
+            />
+          )}
+        />
+      ),
+    },
+  ]);
+
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: C.bg }}>
-        <Loader2 className="animate-spin" size={32} color={C.primary} />
+      <div className="min-h-screen px-5 py-8" style={{ backgroundColor: C.bg }}>
+        <div role="status" aria-label="Carregando dados" className="mx-auto w-full max-w-[480px] animate-pulse">
+          <div className="h-6 w-40 rounded bg-emerald-100 mb-8" />
+          <div className="h-6 w-48 rounded bg-slate-200 mb-3" />
+          <div className="h-4 w-64 max-w-full rounded bg-slate-200 mb-8" />
+          <div className="rounded-xl bg-white p-5 mb-5 space-y-5">
+            <div className="h-4 w-36 rounded bg-slate-200" />
+            <div className="h-4 rounded bg-slate-100" />
+            <div className="h-4 rounded bg-slate-100" />
+            <div className="h-4 rounded bg-slate-100" />
+          </div>
+          <div className="h-12 rounded-xl bg-emerald-100 mb-4" />
+          <div className="h-12 rounded-xl bg-white" />
+        </div>
       </div>
     );
   }
 
   const wrapperStyle = { maxWidth: 480, margin: '0 auto', fontFamily: bodyFont, position: 'relative', boxShadow: '0 0 20px rgba(0,0,0,0.05)' };
 
-  if (view === 'login') {
-    return (
-      <div style={wrapperStyle}>
-        <LoginScreen patients={patients} onEnter={handleEnter} />
-      </div>
-    );
-  }
-
-  const patient = patients.find((p) => p.id === currentPatientId);
-
-  if (view === 'patient-home' && patient) {
-    return (
-      <div style={wrapperStyle}>
-        <PatientHome
-          patient={patient}
-          entries={entriesMap[patient.id] || []}
-          onGoEntry={() => setView('patient-entry')}
-          onGoMeds={() => setView('patient-meds')}
-          onLogout={handleLogout}
-          onResetPassword={handleResetPassword}
-        />
-      </div>
-    );
-  }
-
-  if (view === 'patient-entry' && patient) {
-    return (
-      <div style={wrapperStyle}>
-        <DailyEntryForm
-          patient={patient}
-          onSave={saveEntry}
-          onDone={() => setView('patient-home')}
-          onBack={() => setView('patient-home')}
-        />
-      </div>
-    );
-  }
-
-  if (view === 'patient-meds' && patient) {
-    return (
-      <div style={wrapperStyle}>
-        <MedsScreen
-          patient={patient}
-          meds={medsMap[patient.id] || DEMO_MEDS}
-          taken={takenMap[patient.id] || []}
-          onToggle={toggleMed}
-          onAddMed={addMed}
-          onEditMed={editMed}
-          onDeleteMed={deleteMed}
-          onToggleTaken={toggleMedTaken}
-          onBack={() => setView('patient-home')}
-        />
-      </div>
-    );
-  }
-
-  if (view === 'physio-list') {
-    return (
-      <div style={wrapperStyle}>
-        <PhysioList
-          patients={patients}
-          entriesMap={entriesMap}
-          onSelect={(id) => {
-            setCurrentPatientId(id);
-            setView('physio-report');
-          }}
-          onLogout={handleLogout}
-          onAddPatient={() => setShowNewPatientModal(true)}
-          onEditPatient={(patient) => setEditingPatient(patient)}
-          onDeletePatient={handleDeletePatient}
-        />
-        {showNewPatientModal && (
-          <NewPatientModal
-            onSave={handleAddPatient}
-            onCancel={() => setShowNewPatientModal(false)}
-          />
-        )}
-        {editingPatient && (
-          <EditPatientModal
-            patient={editingPatient}
-            onSave={handleEditPatient}
-            onCancel={() => setEditingPatient(null)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  if (view === 'physio-report' && patient) {
-    return (
-      <div style={wrapperStyle}>
-        <PhysioReport
-          patient={patient}
-          entries={entriesMap[patient.id] || []}
-          meds={medsMap[patient.id] || DEMO_MEDS}
-          taken={takenMap[patient.id] || []}
-          onBack={() => setView('physio-list')}
-        />
-      </div>
-    );
-  }
-
-  return null;
+  return <div style={wrapperStyle}>{route || <Navigate to="/" replace />}</div>;
 }
