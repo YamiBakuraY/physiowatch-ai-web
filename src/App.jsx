@@ -13,11 +13,9 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import { Navigate, useMatch, useNavigate, useParams, useRoutes } from 'react-router-dom';
 
-// URL e Chave já configuradas certinhas para o seu projeto!
-const supabaseUrl = 'https://zjwriejvyajqdrohmili.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpqd3JpZWp2eWFqcWRyb2htaWxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNzg1NzgsImV4cCI6MjEwNDY1NDU3OH0.YH7yKYGIwke_JgsaavLALRHELTD-QzrmI7Wbs3esfYc';
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // ---------- design tokens ----------
 const C = {
   bg: '#F4F7F6',
